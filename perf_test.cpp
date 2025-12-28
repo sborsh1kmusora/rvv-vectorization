@@ -4,7 +4,7 @@
 
 #include "particle_sim.h"
 #include "simd_particle_sim.h"
-#include "vector_particle_sim.h"
+#include "soa_particle_sim.h"
 
 constexpr size_t N = 10000;
 constexpr int STEPS = 100;
@@ -34,7 +34,7 @@ double test_simd_aos() {
     auto start = std::chrono::high_resolution_clock::now();
 
     for (int s = 0; s < STEPS; ++s) {
-        updateSIMD(particles, DT);
+        update(particles, DT);
     }
 
     auto end = std::chrono::high_resolution_clock::now();
@@ -53,7 +53,7 @@ double test_simd_soa() {
     auto start = std::chrono::high_resolution_clock::now();
 
     for (int s = 0; s < STEPS; ++s) {
-        updateSIMD(particles, DT, field);
+        update(particles, DT, field);
     }
 
     auto end = std::chrono::high_resolution_clock::now();

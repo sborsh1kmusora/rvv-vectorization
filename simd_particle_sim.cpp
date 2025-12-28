@@ -1,14 +1,13 @@
-#include "simd_particle_sim.h"
 #include <riscv_vector.h>
 #include <vector>
 #include <cstddef>
-#include "common_types.h"
 
-// Электрическое и магнитное поля
+#include "common_types.h"
+#include "simd_particle_sim.h"
+
 Vector3 E{0.0, 0.0, 0.0};
 Vector3 B{0.0, 0.0, 1.0};
 
-// Lorentz force с использованием m2
 inline void lorentz_force(
     vfloat64m2_t vx,
     vfloat64m2_t vy,
@@ -18,17 +17,23 @@ inline void lorentz_force(
     vfloat64m2_t& fz,
     size_t vl
 ) {
+    // Загрузка электрического поля
     const vfloat64m2_t Ex = __riscv_vfmv_v_f_f64m2(E.x, vl);
     const vfloat64m2_t Ey = __riscv_vfmv_v_f_f64m2(E.y, vl);
     const vfloat64m2_t Ez = __riscv_vfmv_v_f_f64m2(E.z, vl);
 
+    // Загрузка магнитного поля
     const vfloat64m2_t Bx = __riscv_vfmv_v_f_f64m2(B.x, vl);
     const vfloat64m2_t By = __riscv_vfmv_v_f_f64m2(B.y, vl);
     const vfloat64m2_t Bz = __riscv_vfmv_v_f_f64m2(B.z, vl);
 
+    // Обратная скорость света
     const vfloat64m2_t inv_c = __riscv_vfmv_v_f_f64m2(1.0 / LIGHT_VELOCITY, vl);
+
+    // Заряд электрона
     const vfloat64m2_t q = __riscv_vfmv_v_f_f64m2(ELECTRON_CHARGE, vl);
 
+    // Ex + (vy*Bz-vz*By) / c
     fx = __riscv_vfadd_vv_f64m2(
             Ex,
             __riscv_vfmul_vv_f64m2(
@@ -40,6 +45,7 @@ inline void lorentz_force(
                 vl),
             vl);
 
+    // Ey + (vz*Bx-vx*Bz) / c
     fy = __riscv_vfadd_vv_f64m2(
             Ey,
             __riscv_vfmul_vv_f64m2(
@@ -51,6 +57,7 @@ inline void lorentz_force(
                 vl),
             vl);
 
+    // Ez + (vx*By-vy*Bx) / c
     fz = __riscv_vfadd_vv_f64m2(
             Ez,
             __riscv_vfmul_vv_f64m2(
@@ -67,15 +74,15 @@ inline void lorentz_force(
     fz = __riscv_vfmul_vv_f64m2(fz, q, vl);
 }
 
-// SIMD RK4 update для std::vector<Particle>
-void updateSIMD(std::vector<Particle>& particles, FP dt) {
+void update(std::vector<Particle>& particles, FP dt) {
     const size_t n = particles.size();
     size_t i = 0;
 
     while (i < n) {
+        // Количество элементов, которые обрабатываются в одной SIMD инструкции
         size_t vl = __riscv_vsetvl_e64m2(n - i);
 
-        // Загружаем данные (выравненные)
+        // Загружает vl координат из памяти в векторный регистр
         alignas(64) vfloat64m2_t rx = __riscv_vle64_v_f64m2(&particles[i].r.x, vl);
         alignas(64) vfloat64m2_t ry = __riscv_vle64_v_f64m2(&particles[i].r.y, vl);
         alignas(64) vfloat64m2_t rz = __riscv_vle64_v_f64m2(&particles[i].r.z, vl);
@@ -84,12 +91,14 @@ void updateSIMD(std::vector<Particle>& particles, FP dt) {
         alignas(64) vfloat64m2_t vy = __riscv_vle64_v_f64m2(&particles[i].v.y, vl);
         alignas(64) vfloat64m2_t vz = __riscv_vle64_v_f64m2(&particles[i].v.z, vl);
 
-        // RK4 шаги
+        // Сила Лоренца в начале шага (k1)
         vfloat64m2_t k1x, k1y, k1z;
         lorentz_force(vx, vy, vz, k1x, k1y, k1z, vl);
 
+        // Вектор с константой 0.5 * dt для всех vl частиц
         const vfloat64m2_t half_dt = __riscv_vfmv_v_f_f64m2(0.5 * dt, vl);
 
+        // Вычисление скорости частиц в середине шага: vx[i]+k1x[i]*dt/2
         auto vx2 = __riscv_vfadd_vv_f64m2(vx, __riscv_vfmul_vv_f64m2(k1x, half_dt, vl), vl);
         auto vy2 = __riscv_vfadd_vv_f64m2(vy, __riscv_vfmul_vv_f64m2(k1y, half_dt, vl), vl);
         auto vz2 = __riscv_vfadd_vv_f64m2(vz, __riscv_vfmul_vv_f64m2(k1z, half_dt, vl), vl);
@@ -113,7 +122,7 @@ void updateSIMD(std::vector<Particle>& particles, FP dt) {
 
         const vfloat64m2_t dt6 = __riscv_vfmv_v_f_f64m2(dt / 6.0, vl);
 
-        // RK4 обновление скоростей
+        // v = v + dt/6*(k1+2k2+3k3+k4)
         vx = __riscv_vfadd_vv_f64m2(vx,
             __riscv_vfmul_vv_f64m2(
                 __riscv_vfadd_vv_f64m2(
@@ -138,12 +147,12 @@ void updateSIMD(std::vector<Particle>& particles, FP dt) {
                     vl),
                 dt6, vl), vl);
 
-        // Обновление позиций
+        // r[i] = r[i] + v[i]*dt
         rx = __riscv_vfadd_vv_f64m2(rx, __riscv_vfmul_vv_f64m2(vx, __riscv_vfmv_v_f_f64m2(dt, vl), vl), vl);
         ry = __riscv_vfadd_vv_f64m2(ry, __riscv_vfmul_vv_f64m2(vy, __riscv_vfmv_v_f_f64m2(dt, vl), vl), vl);
         rz = __riscv_vfadd_vv_f64m2(rz, __riscv_vfmul_vv_f64m2(vz, __riscv_vfmv_v_f_f64m2(dt, vl), vl), vl);
 
-        // Сохраняем обратно
+        // Cохраняем обратно vl элементов из векторных регистров в массив частиц
         __riscv_vse64_v_f64m2(&particles[i].r.x, rx, vl);
         __riscv_vse64_v_f64m2(&particles[i].r.y, ry, vl);
         __riscv_vse64_v_f64m2(&particles[i].r.z, rz, vl);
@@ -151,6 +160,7 @@ void updateSIMD(std::vector<Particle>& particles, FP dt) {
         __riscv_vse64_v_f64m2(&particles[i].v.y, vy, vl);
         __riscv_vse64_v_f64m2(&particles[i].v.z, vz, vl);
 
+        // Инкрементируем индекс на число обработанных элементов
         i += vl;
     }
 }

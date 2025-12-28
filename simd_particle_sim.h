@@ -16,4 +16,4 @@ inline void lorentz_force(
     size_t vl
 );
 
-void updateSIMD(std::vector<Particle>& particles, FP dt);
+void update(std::vector<Particle>& particles, FP dt);

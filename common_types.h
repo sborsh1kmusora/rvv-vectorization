@@ -1,5 +1,4 @@
-#ifndef COMMON_TYPES_H
-#define COMMON_TYPES_H
+#pragma once
 
 using FP = double;
 
@@ -35,5 +34,3 @@ struct Particle {
     Vector3 r;
     Vector3 v;
 };
-
-#endif

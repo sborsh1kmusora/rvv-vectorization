@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "particle_sim.h"
-#include "vector_particle_sim.h"
+#include "soa_particle_sim.h"
 
 using FP = double;
 
@@ -13,7 +13,6 @@ struct ErrorStats {
     FP rms = 0.0;
 };
 
-// Сравнение двух массивов одинакового размера
 ErrorStats compare(const std::vector<FP>& a, const std::vector<FP>& b)
 {
     ErrorStats e;
@@ -40,15 +39,12 @@ int main() {
     constexpr FP dt = 1e-9;
     constexpr int steps = 500;
 
-    // Поля для scalar и SIMD
     EMField field_scalar;
     EMFieldSoA field_simd;
 
-    // Частицы
     ParticleEnsemble scalar(N);
     ParticleSoA simd(N);
 
-    // Инициализация
     for (size_t i = 0; i < N; ++i) {
         scalar.particles[i].r = {0,0,0};
         scalar.particles[i].v = {1,0,0};
@@ -57,13 +53,11 @@ int main() {
         simd.vx[i] = 1; simd.vy[i] = 0; simd.vz[i] = 0;
     }
 
-    // Основной цикл интегрирования
     for (int s = 0; s < steps; ++s) {
         scalar.update(dt, field_scalar);
-        updateSIMD(simd, dt, field_simd);
+        update(simd, dt, field_simd);
     }
 
-    // Подготовка векторов для сравнения
     std::vector<FP> rx(N), ry(N), rz(N);
     std::vector<FP> vx(N), vy(N), vz(N);
 
@@ -77,8 +71,6 @@ int main() {
         vz[i] = scalar.particles[i].v.z;
     }
 
-    // Сравнение и вывод
-    std::cout << "**** SCALAR vs SIMD ERROR ****\n";
     print("rx", compare(rx, simd.rx));
     print("ry", compare(ry, simd.ry));
     print("rz", compare(rz, simd.rz));

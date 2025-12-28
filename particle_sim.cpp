@@ -1,6 +1,6 @@
 #include "particle_sim.h"
 
-Vector3 ParticleEnsemble::lorentzForce(
+Vector3 ParticleEnsemble::lorentz_force(
     const Vector3& v,
     const EMField& field
 ) const {
@@ -19,10 +19,10 @@ void ParticleEnsemble::update(FP dt, const EMField& field) {
 
         p.r += (k1r + k2r*2 + k3r*2 + k4r) * dt6;
 
-        Vector3 k1v = lorentzForce(p.v, field);
-        Vector3 k2v = lorentzForce(p.v + k1v * (0.5 * dt), field);
-        Vector3 k3v = lorentzForce(p.v + k2v * (0.5 * dt), field);
-        Vector3 k4v = lorentzForce(p.v + k3v * dt, field);
+        Vector3 k1v = lorentz_force(p.v, field);
+        Vector3 k2v = lorentz_force(p.v + k1v * (0.5 * dt), field);
+        Vector3 k3v = lorentz_force(p.v + k2v * (0.5 * dt), field);
+        Vector3 k4v = lorentz_force(p.v + k3v * dt, field);
 
         p.v += (k1v + k2v*2 + k3v*2 + k4v) * coeffV;
     }
