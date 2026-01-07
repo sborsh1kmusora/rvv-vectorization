@@ -24,9 +24,10 @@ public:
     }
 
     void update(FP dt, const EMField& field);
+    void updateSIMD(FP dt, const EMField& field);
 
     std::vector<Particle> particles;
 
 private:
-    Vector3 lorentz_force(const Vector3& v, const EMField& field) const;
+    Vector3 lorentzForce(const Vector3& v, const EMField& field) const;
 };
